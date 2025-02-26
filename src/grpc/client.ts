@@ -41,8 +41,13 @@ if (!proposeServiceClient) {
     process.exit(1);
 }
 
-const deployClient = new deployServiceClient('localhost:40401', grpc.credentials.createInsecure());
-const proposeClient = new proposeServiceClient('localhost:40402', grpc.credentials.createInsecure());
+// const deployClient = new deployServiceClient('localhost:40401', grpc.credentials.createInsecure());
+// const proposeClient = new proposeServiceClient('localhost:40402', grpc.credentials.createInsecure());
+
+
+//asi dev env
+const deployClient = new deployServiceClient('146.235.215.215:30001', grpc.credentials.createInsecure());
+const proposeClient = new proposeServiceClient('146.235.215.215:30002', grpc.credentials.createInsecure());
 
 // console.log("🔹 Available gRPC methods for deployServiceClient:", Object.keys(deployClient.__proto__));
 // console.log("🔹 Available gRPC methods for proposeServiceClient:", Object.keys(proposeClient.__proto__));
@@ -151,7 +156,6 @@ function deployDataProtobufSerialize(deployData: UnsignedDeployData) {
     const writeString = (order: number, val: string) => val != "" && writer.writeString(order, val);
     const writeInt64  = (order: number, val: number) => val != 0  && writer.writeInt64(order, val);
 
-    // Серіалізація полів
     writeString(2, term);
     writeInt64(3, timestamp);
     writeInt64(7, phloPrice);

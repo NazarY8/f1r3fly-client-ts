@@ -114,6 +114,7 @@ new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
 
 This contract prints **"Hello, World!"** when executed. 
 BTW, this is just an example, you can always change the example of a contract or other settings in test-grpc.ts 
+
 ---
 
 ## 📜 Project Structure

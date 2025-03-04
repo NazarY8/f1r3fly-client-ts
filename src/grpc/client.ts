@@ -1,6 +1,5 @@
+import * as grpc from "@grpc/grpc-js";
 import {ServiceError} from "@grpc/grpc-js";
-
-import * as grpc from '@grpc/grpc-js';
 import {ec} from 'elliptic';
 import {blake2b} from 'blakejs';
 import {BinaryWriter} from 'google-protobuf';
@@ -76,39 +75,46 @@ export const signDeploy = function (privateKey: ec.KeyPair | string, deployObj: 
     return deployData;
 };
 
-//TODO should be fixed, something with verifier => string not array
+export const verifyDeploy = (deployObj: DeployDataProto) => {
+    const {
+        term, timestamp, phlolimit, phloprice, validafterblocknumber, shardid,
+        sigalgorithm, deployer, sig,
+    } = deployObj.toObject();
 
-// export const verifyDeploy = (deployObj: DeployDataProto) => {
-//     const {
-//         term, timestamp, phlolimit, phloprice, validafterblocknumber, shardid,
-//         sigalgorithm, deployer, sig,
-//     } = deployObj.toObject();
-//
-//     console.log("verify to object", deployObj.toObject())
-//     const deployData = new DeployDataProto();
-//     deployData.setTerm(term);
-//     deployData.setTimestamp(timestamp);
-//     deployData.setPhlolimit(phlolimit);
-//     deployData.setPhloprice(phloprice);
-//     deployData.setValidafterblocknumber(validafterblocknumber);
-//     deployData.setShardid(shardid);
-//
-//     if(typeof deployer==="string") {
-//         console.log("deployer string ")
-//         console.log(deployer)
-//     }
-//     const upd_deployer = Buffer.from(deployer as string, "base64")
-//     console.log("upd_deployer: ", upd_deployer)
-//     // console.log("  deployer:", Buffer.from(deployer).toString('hex'));
-//     // console.log("  sig:", Buffer.from(sig).toString('hex'));
-//     const deploySerialized = deployDataProtobufSerialize(deployData);
-//     const crypt = new ec(sigalgorithm);
-//     // console.log("verify crypt: ", sigalgorithm)
-//     const key = crypt.keyFromPublic(upd_deployer);
-//     const hashed = blake2b(deploySerialized, undefined, 32);
-//     return key.verify(hashed, sig);
-// };
+    console.log("verify to object", deployObj.toObject());
+    const deployData = new DeployDataProto();
+    deployData.setTerm(term);
+    deployData.setTimestamp(timestamp);
+    deployData.setPhlolimit(phlolimit);
+    deployData.setPhloprice(phloprice);
+    deployData.setValidafterblocknumber(validafterblocknumber);
+    deployData.setShardid(shardid);
 
+    const deploySerialized = deployDataProtobufSerialize(deployData);
+    const crypt = new ec(sigalgorithm);
+
+    //based on new generated types, deployer and sig come to us as string, not like an arrays, so we should cast it with base64
+    let deployerUint8Array: Uint8Array;
+    if (typeof deployer === "string") {
+        deployerUint8Array = Buffer.from(deployer, "base64");
+    } else {
+        deployerUint8Array = deployer;
+    }
+
+    let sigBuffer: Uint8Array;
+    if (typeof sig === "string") {
+        sigBuffer = Buffer.from(sig, "base64");
+    } else if (sig instanceof Uint8Array) {
+        sigBuffer = sig;
+    } else {
+        console.error("Invalid signature format:", sig);
+        throw new Error("Invalid signature format.");
+    }
+
+    const key = crypt.keyFromPublic(deployerUint8Array);
+    const hashed = blake2b(deploySerialized, undefined, 32);
+    return key.verify(hashed, sigBuffer);
+};
 
 export const grpcClient = {
     lastFinalizedBlock: async (): Promise<LastFinalizedBlockResponse> => {

@@ -1,6 +1,6 @@
-import { grpcClient, signDeploy } from "../grpc/client";
-import { DeployDataProto } from "../../generated/CasperMessage_pb.js";
-import { ProposeQuery } from "../../generated/ProposeServiceCommon_pb.js";
+import {grpcClient, signDeploy, verifyDeploy} from "../grpc/client";
+import {DeployDataProto} from "../../generated/CasperMessage_pb.js";
+import {ProposeQuery} from "../../generated/ProposeServiceCommon_pb.js";
 import {DataAtNameByBlockQuery, IsFinalizedQuery} from "../../generated/DeployServiceCommon_pb.js";
 import {DeployResponse} from "../../generated/DeployServiceV1_pb.js";
 import {Expr, Par} from "../../generated/RhoTypes_pb";
@@ -27,8 +27,8 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
         const signedDeploy: DeployDataProto = signDeploy(privateKey, deployData);
         console.log('✅ SIGNED DEPLOY:', JSON.stringify(signedDeploy, null, 2));
 
-        // const isValidDeploy = verifyDeploy(signedDeploy);
-        // console.log(`✅ DEPLOY IS VALID: ${isValidDeploy ? "✔️" : "❌"}`);
+        const isValidDeploy = verifyDeploy(signedDeploy);
+        console.log(`✅ DEPLOY IS VALID: ${isValidDeploy ? "✔️" : "❌"}`);
 
         const deployResponse: DeployResponse = await grpcClient.doDeploy(signedDeploy)
 
@@ -79,7 +79,7 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
         console.log("🚀 ✅ Deploy is finalized! 🚀");
 
 
-        // HOW TO FETCH SOME DATA BY CHANNEL NAME
+        // TODO HOW TO FETCH SOME DATA BY CHANNEL NAME
         const par = new Par;
         const expr = new Expr();
         expr.setGString('channelName')

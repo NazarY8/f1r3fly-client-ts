@@ -91,20 +91,20 @@ const finalizeResponse: IsFinalizedResponse = await grpcClient.isFinalized(final
 ```
 
 ### **getDataAtName**
-Checks if a block has been finalized.
+Fetches data by blockHash and channel name
 ```typescript
 const dataAtNameResponse: RhoDataResponse = await grpcClient.getDataAtName(query)
 ```
 
 ### **listenForDataAtName**
-Checks if a block has been finalized.
+Fetches data by depth number and channel name
 ```typescript
 const dataAtListenNameResponse: ListeningNameDataResponse = await grpcClient.listenForDataAtName(listenQuery)
 ```
 ---
 
 ## 📄 Example Rholang Smart Contract
-The client deploys the following **Hello World** contract:
+**Hello World** example contract:
 ```rholang
 new helloWorld, stdout(`rho:io:stdout`), stdoutAck(`rho:io:stdoutAck`) in {
   contract helloWorld(@name) = {

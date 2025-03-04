@@ -1,9 +1,15 @@
 import {grpcClient, signDeploy, verifyDeploy} from "../grpc/client";
 import {DeployDataProto} from "../../generated/CasperMessage_pb.js";
 import {ProposeQuery} from "../../generated/ProposeServiceCommon_pb.js";
-import {DataAtNameByBlockQuery, IsFinalizedQuery} from "../../generated/DeployServiceCommon_pb.js";
-import {DeployResponse} from "../../generated/DeployServiceV1_pb.js";
+import {DataAtNameByBlockQuery, DataAtNameQuery, IsFinalizedQuery} from "../../generated/DeployServiceCommon_pb.js";
+import {
+    DeployResponse,
+    IsFinalizedResponse,
+    ListeningNameDataResponse,
+    RhoDataResponse
+} from "../../generated/DeployServiceV1_pb.js";
 import {Expr, Par} from "../../generated/RhoTypes_pb";
+import {ProposeResponse} from "../../generated/ProposeServiceV1_pb";
 
 (async () => {
     try {
@@ -11,9 +17,9 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
         const lastBlock = await grpcClient.lastFinalizedBlock();
         console.log('✅ Last Finalized Block:', lastBlock.toObject());
 
-        const rholangCode = `@"channelName"!("hey!")`;
+        const rholangCode = `@"channelName"!("again hey")| new out(\`rho:io:stdout\`) in { out!("Nodejs deploy test") }`;
 
-        const privateKey = '7244b253599356233fd179a577396dd6336c100b32426fe72e29067e6d9ff261';
+        const privateKey = '2bdb72a06bacbf46bbfec8f76af6b7bf85de0f297874683b08f9a51196600460';
 
         const deployData = new DeployDataProto();
         deployData.setTerm(rholangCode);
@@ -41,8 +47,8 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
 
         console.log('🟡 Proposing new block...');
 
-        const proposeQuery = new ProposeQuery();
-        const proposeResponse = await grpcClient.propose(proposeQuery)
+        const proposeQuery: ProposeQuery = new ProposeQuery();
+        const proposeResponse: ProposeResponse = await grpcClient.propose(proposeQuery)
 
         console.log("🔹 Full propose response:", proposeResponse.toObject());
 
@@ -69,7 +75,7 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
 
         const finalizeQuery = new IsFinalizedQuery();
         finalizeQuery.setHash(blockHash);
-        const finalizeResponse = await grpcClient.isFinalized(finalizeQuery)
+        const finalizeResponse: IsFinalizedResponse = await grpcClient.isFinalized(finalizeQuery)
 
         if (!finalizeResponse.getIsfinalized()) {
             console.log("❌ Deploy is NOT finalized yet.");
@@ -79,27 +85,45 @@ import {Expr, Par} from "../../generated/RhoTypes_pb";
         console.log("🚀 ✅ Deploy is finalized! 🚀");
 
 
-        // TODO HOW TO FETCH SOME DATA BY CHANNEL NAME
+        // TODO HOW TO FETCH SOME DATA BY CHANNEL NAME (needed concrete block)
         const par = new Par;
         const expr = new Expr();
-        expr.setGString('channelName')
-        par.setExprsList([expr]);
-        //par.addExprs(expr);
-        var query = new DataAtNameByBlockQuery();
+        expr.setGString('channelName');
 
+        par.addExprs(expr)
+        var query = new DataAtNameByBlockQuery();
         query.setPar(par)
         query.setBlockhash(blockHash)
         query.setUseprestatehash(false)
 
-
         console.log("🔹 Query structure:", JSON.stringify(query.toObject(), null, 2));
 
-        const dataAtNameResponse = await grpcClient.getDataAtName(query)
+        const dataAtNameResponse: RhoDataResponse = await grpcClient.getDataAtName(query)
 
         if (dataAtNameResponse.hasError()) {
             console.error("❌ Error fetching data at name:", dataAtNameResponse.getError()?.toObject());
         } else {
-            console.log("✅ Data at name response:", dataAtNameResponse.getPayload());
+            console.log("✅ All data from channel", dataAtNameResponse.getPayload()?.getParList().map((par) => par.toObject()))
+            var dataFromChannel = dataAtNameResponse.getPayload()?.getParList() || [];
+            console.log("✅ Last messages:", extractGStringFromParList(dataFromChannel));
+        }
+
+        //TODO how to fetch data without block
+        var listenQuery = new DataAtNameQuery()
+        listenQuery.setDepth(10)
+        listenQuery.setName(par)
+
+        const dataAtListenNameResponse: ListeningNameDataResponse = await grpcClient.listenForDataAtName(listenQuery)
+
+        if (dataAtListenNameResponse.hasError()) {
+            console.error("❌ Error fetching data at listen name:", dataAtNameResponse.getError()?.toObject());
+        } else {
+            var listenDataFromChannel = dataAtListenNameResponse.getPayload()?.getBlockinfoList().at(0)?.getPostblockdataList() || []
+            console.log("✅ Listen data by depth: ", extractGStringFromParList(listenDataFromChannel))
+        }
+
+        function extractGStringFromParList(parList: Array<Par>) {
+            return parList.map((par) => par.toObject()).map((x) => x.exprsList.map((e) => e.gString))
         }
 
     } catch (error) {

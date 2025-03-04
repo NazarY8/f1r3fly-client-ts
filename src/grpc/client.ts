@@ -5,7 +5,7 @@ import {blake2b} from 'blakejs';
 import {BinaryWriter} from 'google-protobuf';
 
 import {
-    DataAtNameByBlockQuery,
+    DataAtNameByBlockQuery, DataAtNameQuery,
     IsFinalizedQuery,
     LastFinalizedBlockQuery
 } from "../../generated/DeployServiceCommon_pb.js";
@@ -13,7 +13,7 @@ import {
 import {
     DeployResponse,
     IsFinalizedResponse,
-    LastFinalizedBlockResponse,
+    LastFinalizedBlockResponse, ListeningNameDataResponse,
     RhoDataResponse
 } from "../../generated/DeployServiceV1_pb.js";
 import {ProposeResponse} from "../../generated/ProposeServiceV1_pb.js";
@@ -29,8 +29,8 @@ const proposeClient: ProposeServiceClient = new ProposeServiceClient('localhost:
 
 
 //asi dev env
-//const deployClient : DeployServiceClient= new DeployServiceClient('146.235.215.215:30001', grpc.credentials.createInsecure());
-//const proposeClient : = new ProposeServiceClient('146.235.215.215:30002', grpc.credentials.createInsecure());
+// const deployClient: DeployServiceClient = new DeployServiceClient('146.235.215.215:30001', grpc.credentials.createInsecure());
+// const proposeClient: ProposeServiceClient = new ProposeServiceClient('146.235.215.215:30002', grpc.credentials.createInsecure());
 
 console.log("🔹 Available gRPC methods for deployServiceClient:", Object.keys(deployClient));
 console.log("🔹 Available gRPC methods for proposeServiceClient:", Object.keys(proposeClient));
@@ -176,7 +176,19 @@ export const grpcClient = {
                 }
             });
         });
-    }
+    },
+
+    listenForDataAtName: async (query: DataAtNameQuery): Promise<ListeningNameDataResponse> => {
+        return new Promise((resolve, reject) => {
+            deployClient.listenForDataAtName(query, (error: ServiceError | null, response: ListeningNameDataResponse) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve(response);
+                }
+            });
+        });
+    },
 };
 
 

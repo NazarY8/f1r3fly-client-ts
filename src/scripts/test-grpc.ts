@@ -1,77 +1,64 @@
-import { grpcClient, signDeploy, UnsignedDeployData, verifyDeploy } from "../grpc/client";
-
-export default grpcClient;
+import { grpcClient, signDeploy } from "../grpc/client";
+import { DeployDataProto } from "../../generated/CasperMessage_pb.js";
+import { ProposeQuery } from "../../generated/ProposeServiceCommon_pb.js";
+import {DataAtNameByBlockQuery, IsFinalizedQuery} from "../../generated/DeployServiceCommon_pb.js";
+import {DeployResponse} from "../../generated/DeployServiceV1_pb.js";
+import {Expr, Par} from "../../generated/RhoTypes_pb";
 
 (async () => {
     try {
         console.log('🔹 Fetching Last Finalized Block...');
         const lastBlock = await grpcClient.lastFinalizedBlock();
-        console.log('✅ Last Finalized Block:', lastBlock);
+        console.log('✅ Last Finalized Block:', lastBlock.toObject());
 
-        const rholangCode = `
-            new helloWorld, stdout(\`rho:io:stdout\`), stdoutAck(\`rho:io:stdoutAck\`) in {
-              contract helloWorld(@name) = {
-                new ack in {
-                  stdoutAck!("Hello, ", *ack) |
-                  for (_ <- ack) {
-                    stdoutAck!(name, *ack) |
-                    for (_ <- ack) {
-                      stdout!("\\n")
-                    }
-                  }
-                }
-              } |
-              helloWorld!("World!!")
-            }
-        `;
+        const rholangCode = `@"channelName"!("hey!")`;
 
-        const privateKey = 'a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954';
-        const deployData: UnsignedDeployData = {
-            term: rholangCode,
-            timestamp: Date.now(),
-            phloPrice: 1,
-            phloLimit: 50000,
-            validAfterBlockNumber: 0,
-            shardId: 'root',
-        };
+        const privateKey = '7244b253599356233fd179a577396dd6336c100b32426fe72e29067e6d9ff261';
+
+        const deployData = new DeployDataProto();
+        deployData.setTerm(rholangCode);
+        deployData.setTimestamp(Date.now());
+        deployData.setPhloprice(1);
+        deployData.setPhlolimit(50000);
+        deployData.setValidafterblocknumber(0);
+        deployData.setShardid('root');
 
         console.log('🟡 Signing Deploy...');
-        const signedDeploy = signDeploy(privateKey, deployData);
+        const signedDeploy: DeployDataProto = signDeploy(privateKey, deployData);
         console.log('✅ SIGNED DEPLOY:', JSON.stringify(signedDeploy, null, 2));
 
-        const isValidDeploy = verifyDeploy(signedDeploy);
-        console.log(`✅ DEPLOY IS VALID: ${isValidDeploy ? "✔️" : "❌"}`);
+        // const isValidDeploy = verifyDeploy(signedDeploy);
+        // console.log(`✅ DEPLOY IS VALID: ${isValidDeploy ? "✔️" : "❌"}`);
 
-        console.log("📤 Перед відправкою (новий клієнт):", JSON.stringify(signedDeploy, null, 2));
+        const deployResponse: DeployResponse = await grpcClient.doDeploy(signedDeploy)
 
-        const deployResponse = await grpcClient.doDeploy(signedDeploy) as { result?: string; error?: { messages: string[] } };
-
-        if (deployResponse.result) {
-            console.log("✅ DEPLOY RESPONSE Success!", deployResponse.result);
-        } else if (deployResponse.error) {
-            console.error("❌ DEPLOY ERROR:", deployResponse.error.messages);
+        if (deployResponse.getResult()) {
+            console.log("✅ DEPLOY RESPONSE Success!", deployResponse.getResult());
+        } else if (deployResponse.getError()) {
+            console.error("❌ DEPLOY ERROR:", deployResponse.getError());
             return;
         }
 
         console.log('🟡 Proposing new block...');
-        const proposeResponse = await grpcClient.propose() as { result?: string; error?: { messagesList?: string[] } };
 
-        console.log("🔹 Full propose response:", proposeResponse);
+        const proposeQuery = new ProposeQuery();
+        const proposeResponse = await grpcClient.propose(proposeQuery)
 
-        if (proposeResponse.error && Array.isArray(proposeResponse.error.messagesList)) {
-            const errorMessage = proposeResponse.error.messagesList.join("\n");
+        console.log("🔹 Full propose response:", proposeResponse.toObject());
+
+        if (proposeResponse.hasError() && Array.isArray(proposeResponse.hasError())) {
+            const errorMessage = proposeResponse.hasError()
             console.error("🚨 Propose failed with error:", errorMessage);
             throw new Error(`Propose failed: ${errorMessage}`);
         }
 
-        const proposeRes = proposeResponse.result;
+        const proposeRes = proposeResponse.getResult();
         if (!proposeRes || proposeRes.trim() === "") {
             throw new Error("Propose failed: Empty response");
         }
 
         console.log("✅ PROPOSE RESPONSE", proposeRes);
 
-        // 🔹 Отримуємо хеш блоку, якщо він є в відповіді
         const match = proposeRes.match(/Success! Block (\w+) created and added\./);
         if (!match) {
             throw new Error("Propose did not return a valid block hash.");
@@ -80,15 +67,40 @@ export default grpcClient;
         const blockHash = match[1];
         console.log("🔹 Extracted block hash:", blockHash);
 
-        // 🔹 Додаємо перевірку фіналізації
-        const finalizeResponse = await grpcClient.isFinalized({ hash: blockHash }) as { isFinalized?: boolean };
+        const finalizeQuery = new IsFinalizedQuery();
+        finalizeQuery.setHash(blockHash);
+        const finalizeResponse = await grpcClient.isFinalized(finalizeQuery)
 
-        if (!finalizeResponse.isFinalized) {
+        if (!finalizeResponse.getIsfinalized()) {
             console.log("❌ Deploy is NOT finalized yet.");
             throw new Error(`Block ${blockHash} is not finalized.`);
         }
 
         console.log("🚀 ✅ Deploy is finalized! 🚀");
+
+
+        // HOW TO FETCH SOME DATA BY CHANNEL NAME
+        const par = new Par;
+        const expr = new Expr();
+        expr.setGString('channelName')
+        par.setExprsList([expr]);
+        //par.addExprs(expr);
+        var query = new DataAtNameByBlockQuery();
+
+        query.setPar(par)
+        query.setBlockhash(blockHash)
+        query.setUseprestatehash(false)
+
+
+        console.log("🔹 Query structure:", JSON.stringify(query.toObject(), null, 2));
+
+        const dataAtNameResponse = await grpcClient.getDataAtName(query)
+
+        if (dataAtNameResponse.hasError()) {
+            console.error("❌ Error fetching data at name:", dataAtNameResponse.getError()?.toObject());
+        } else {
+            console.log("✅ Data at name response:", dataAtNameResponse.getPayload());
+        }
 
     } catch (error) {
         console.error('❌ gRPC Error:', error);

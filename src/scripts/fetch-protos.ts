@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-const PROTO_DIR = path.join(process.cwd(), 'src/protos');
+const PROTO_DIR = path.join(process.cwd(), 'protos');
 const SCALAPB_DIR = path.join(PROTO_DIR, 'scalapb');
 
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/F1R3FLY-io/f1r3fly/main/models/src/main/protobuf';
